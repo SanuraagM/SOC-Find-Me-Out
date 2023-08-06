@@ -1,0 +1,147 @@
+pip install opencv-python dlib face-recognition
+
+import zipfile
+
+zip_file_path = '/content/archive (2).zip'
+destination_path = '/content/'
+
+with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+    zip_ref.extractall(destination_path)
+
+!pip install tensorflow
+!pip install numpy
+!pip install opencv-python
+
+
+pip install efficientnet
+
+
+import os
+import numpy as np
+import cv2
+import tensorflow as tf
+from tensorflow.keras import layers, models
+import matplotlib.pyplot as plt
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.optimizers import Adam
+
+# Set the paths to train and test folders
+train_data_dir = '/content/train'
+test_data_dir = '/content/test'
+
+# Function to load and resize images and labels from the specified folder
+def load_data(data_dir, target_size=(224, 224)):
+    images = []
+    labels = []
+    celebrities = os.listdir(data_dir)
+    for label, celebrity in enumerate(celebrities):
+        celebrity_folder = os.path.join(data_dir, celebrity)
+        for image_name in os.listdir(celebrity_folder):
+            image_path = os.path.join(celebrity_folder, image_name)
+            image = cv2.imread(image_path)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            image = cv2.resize(image, target_size)  # Resize the image
+            images.append(image)
+            labels.append(label)
+    return np.array(images), np.array(labels)
+
+# Load training and testing data
+train_images, train_labels = load_data(train_data_dir)
+test_images, test_labels = load_data(test_data_dir)
+
+# Normalize the pixel values to [0, 1]
+train_images = train_images.astype('float32') / 255.0
+test_images = test_images.astype('float32') / 255.0
+
+# Create MobileNetV2 model with pre-trained weights (excluding the top classification layers)
+base_model = MobileNetV2(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
+
+# Freeze the layers in the pre-trained model
+for layer in base_model.layers:
+    layer.trainable = False
+
+# Add our own classification layers on top of the base model
+model = models.Sequential([
+    base_model,
+    layers.GlobalAveragePooling2D(),
+    layers.Dense(128, activation='relu'),
+    layers.Dropout(0.5),
+    layers.Dense(5, activation='softmax')
+])
+
+# Compile the model
+model.compile(optimizer=Adam(learning_rate=0.0001),
+              loss='sparse_categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Train the model
+history = model.fit(train_images, train_labels, epochs=10, batch_size=32, validation_split=0.2)
+
+# Evaluate the model on the test set
+test_loss, test_accuracy = model.evaluate(test_images, test_labels)
+print(f'Test accuracy: {test_accuracy}')
+
+# Save the model for future use
+model.save('face_recognition_model_mobilenetv2.h5')
+
+# Plot the training and validation accuracy over epochs
+plt.figure(figsize=(8, 6))
+plt.plot(history.history['accuracy'], label='Training Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Training and Validation Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Plot the training and validation loss over epochs
+plt.figure(figsize=(8, 6))
+plt.plot(history.history['loss'], label='Training Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.title('Training and Validation Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+import cv2
+import numpy as np
+import tensorflow as tf
+
+# Load the trained model
+model = tf.keras.models.load_model('/content/face_recognition_model_efficientnetb0.h5')
+
+# Function to preprocess the image
+def preprocess_image(image_path, target_size=(224, 224)):
+    image = cv2.imread(image_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = cv2.resize(image, target_size)
+    image = image.astype('float32') / 255.0
+    return np.expand_dims(image, axis=0)  # Add batch dimension
+
+# Path to the JPG file you want to identify (replace this with the actual file path)
+jpg_file_path = '/content/download.jpg'
+
+# Preprocess the image
+input_image = preprocess_image(jpg_file_path)
+
+# Make the prediction using the model
+prediction = model.predict(input_image)
+
+# Get the index of the predicted class (celebrity)
+predicted_class_index = np.argmax(prediction)
+
+# Load the list of celebrity names from the training data
+celebrity_names = os.listdir('/content/train')
+
+# Get the name of the predicted celebrity
+predicted_celebrity = celebrity_names[predicted_class_index]
+
+print(f'The predicted celebrity is: {predicted_celebrity}')
+
+
+
+from google.colab import drive
+drive.mount('/content/drive')
